@@ -442,7 +442,7 @@ arr_macro = { version = "0.2.1" }
 
 # depending on fork for bumped nix dependency
 # https://github.com/heim-rs/heim/pull/360
-heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix", default-features = false, features = ["disk"], optional = true }
+heim = { path = "../heim/heim", default-features = false, features = ["disk"], optional = true }
 
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.10.5", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
@@ -512,8 +512,20 @@ vendored = ["rdkafka?/gssapi-vendored"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
 base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib"]
-# Like `base` but excludes sources-host_metrics (and thus the heim git-fork dependency)
-minimal = ["api", "api-client", "enrichment-tables", "sinks", "sources-logs", "sources-apache_metrics", "sources-aws_ecs_metrics", "sources-eventstoredb_metrics", "sources-internal_metrics", "sources-mongodb_metrics", "sources-nginx_metrics", "sources-postgresql_metrics", "sources-prometheus", "sources-static_metrics", "sources-statsd", "sources-vector", "sources-websocket", "transforms", "secrets", "vrl/stdlib"]
+# Minimal feature profile matching vector.yaml: OTLP in, Datadog out, internal telemetry, remap transforms
+minimal = [
+  "api",
+  "transforms-remap",
+  "vrl/stdlib",
+  # Sources used in vector.yaml
+  "sources-opentelemetry",
+  "sources-internal_logs",
+  "sources-internal_metrics",
+  # Sinks used in vector.yaml
+  "sinks-datadog_logs",
+  "sinks-datadog_metrics",
+  "sinks-datadog_traces",
+]
 enable-api-client = ["base", "api-client"]
 enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
 
