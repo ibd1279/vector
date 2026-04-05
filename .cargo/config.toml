@@ -7,6 +7,8 @@ vdev = "run --quiet --package vdev --"
 # coarsens jemalloc's allocation granularity; no regression was measured in
 # https://github.com/vectordotdev/vector/pull/18481.
 JEMALLOC_SYS_WITH_LG_PAGE = "16"
+# Disable linker version script in librdkafka: FreeBSD's lld errors on undefined symbols in version scripts
+DISABLE_LDS = "y"
 
 [target.'cfg(all())']
 rustflags = [

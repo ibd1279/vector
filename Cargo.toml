@@ -470,7 +470,7 @@ arr_macro = { version = "0.2.1" }
 
 # depending on fork for bumped nix dependency
 # https://github.com/heim-rs/heim/pull/360
-heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix", default-features = false, features = ["disk"], optional = true }
+heim = { path = "../heim/heim", default-features = false, features = ["disk"], optional = true }
 
 # make sure to update the external docs when the Lua version changes
 mlua = { workspace = true, features = ["macros"], optional = true }
