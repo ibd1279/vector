@@ -10,6 +10,7 @@ use vrl::{
 use super::{
     common::{kv_list_into_value, to_hex},
     proto::{
+        common::v1::InstrumentationScope,
         resource::v1::Resource,
         trace::v1::{
             ResourceSpans, Span, Status as SpanStatus,
@@ -23,6 +24,9 @@ pub const SPAN_ID_KEY: &str = "span_id";
 pub const DROPPED_ATTRIBUTES_COUNT_KEY: &str = "dropped_attributes_count";
 pub const RESOURCE_KEY: &str = "resources";
 pub const ATTRIBUTES_KEY: &str = "attributes";
+pub const SCOPE_KEY: &str = "scope";
+pub const NAME_KEY: &str = "name";
+pub const VERSION_KEY: &str = "version";
 
 impl ResourceSpans {
     pub fn into_event_iter(self) -> impl Iterator<Item = Event> {
@@ -31,10 +35,14 @@ impl ResourceSpans {
 
         self.scope_spans
             .into_iter()
-            .flat_map(|instrumentation_library_spans| instrumentation_library_spans.spans)
-            .map(move |span| {
+            .flat_map(|scope_spans| {
+                let scope = scope_spans.scope;
+                scope_spans.spans.into_iter().map(move |span| (scope.clone(), span))
+            })
+            .map(move |(scope, span)| {
                 ResourceSpan {
                     resource: resource.clone(),
+                    scope,
                     span,
                 }
                 .into_event(now)
@@ -44,6 +52,7 @@ impl ResourceSpans {
 
 struct ResourceSpan {
     resource: Option<Resource>,
+    scope: Option<InstrumentationScope>,
     span: Span,
 }
 
@@ -111,6 +120,26 @@ impl ResourceSpan {
                 event_path!(RESOURCE_KEY),
                 kv_list_into_value(resource.attributes),
             );
+        }
+        if let Some(scope) = self.scope {
+            if !scope.name.is_empty() {
+                trace.insert(event_path!(SCOPE_KEY, NAME_KEY), scope.name);
+            }
+            if !scope.version.is_empty() {
+                trace.insert(event_path!(SCOPE_KEY, VERSION_KEY), scope.version);
+            }
+            if !scope.attributes.is_empty() {
+                trace.insert(
+                    event_path!(SCOPE_KEY, ATTRIBUTES_KEY),
+                    kv_list_into_value(scope.attributes),
+                );
+            }
+            if scope.dropped_attributes_count > 0 {
+                trace.insert(
+                    event_path!(SCOPE_KEY, DROPPED_ATTRIBUTES_COUNT_KEY),
+                    Value::from(scope.dropped_attributes_count),
+                );
+            }
         }
         trace.insert(event_path!("ingest_timestamp"), Value::from(now));
         trace.into()

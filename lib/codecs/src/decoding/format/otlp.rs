@@ -208,6 +208,7 @@ mod tests {
             logs::v1::ExportLogsServiceRequest, metrics::v1::ExportMetricsServiceRequest,
             trace::v1::ExportTraceServiceRequest,
         },
+        common::v1::InstrumentationScope,
         logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
         metrics::v1::{Metric, ResourceMetrics, ScopeMetrics},
         resource::v1::Resource,
@@ -288,7 +289,12 @@ mod tests {
                     dropped_attributes_count: 0,
                 }),
                 scope_spans: vec![ScopeSpans {
-                    scope: None,
+                    scope: Some(InstrumentationScope {
+                        name: "test-library".to_string(),
+                        version: "1.0.0".to_string(),
+                        attributes: vec![],
+                        dropped_attributes_count: 0,
+                    }),
                     spans: vec![Span {
                         trace_id: TEST_TRACE_ID.to_vec(),
                         span_id: TEST_SPAN_ID.to_vec(),

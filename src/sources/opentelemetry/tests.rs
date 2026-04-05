@@ -176,7 +176,12 @@ fn create_test_traces_request() -> ExportTraceServiceRequest {
         resource_spans: vec![ResourceSpans {
             resource: None,
             scope_spans: vec![ScopeSpans {
-                scope: None,
+                scope: Some(InstrumentationScope {
+                    name: "test-library".to_string(),
+                    version: "1.0.0".to_string(),
+                    attributes: vec![],
+                    dropped_attributes_count: 0,
+                }),
                 spans: vec![Span {
                     trace_id: (1..17).collect::<Vec<u8>>(),
                     span_id: (1..9).collect::<Vec<u8>>(),
