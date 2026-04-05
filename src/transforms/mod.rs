@@ -33,6 +33,8 @@ pub mod tag_cardinality_limit;
 pub mod throttle;
 #[cfg(feature = "transforms-trace_to_log")]
 pub mod trace_to_log;
+#[cfg(feature = "transforms-otel_to_datadog")]
+pub mod otel_to_datadog;
 #[cfg(feature = "transforms-window")]
 pub mod window;
 

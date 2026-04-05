@@ -519,12 +519,18 @@ minimal = [
   "vrl/stdlib",
   # Sources used in vector.yaml
   "sources-opentelemetry",
+  "sources-syslog",
   "sources-internal_logs",
   "sources-internal_metrics",
+  # Transforms
+  "transforms-otel_to_datadog",
   # Sinks used in vector.yaml
   "sinks-datadog_logs",
   "sinks-datadog_metrics",
   "sinks-datadog_traces",
+  # Debug sinks
+  "sinks-console",
+  "sinks-file",
 ]
 enable-api-client = ["base", "api-client"]
 enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
@@ -803,6 +809,7 @@ transforms-sample = ["transforms-impl-sample"]
 transforms-tag_cardinality_limit = ["dep:bloomy", "dep:hashbrown"]
 transforms-throttle = ["dep:governor"]
 transforms-trace_to_log = []
+transforms-otel_to_datadog = []
 
 # Implementations of transforms
 transforms-impl-sample = []
