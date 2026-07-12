@@ -90,7 +90,12 @@ fn bytes_as_str(value: &Value) -> Option<&str> {
 /// panics on non-Float values in the metrics map).  Everything else goes to
 /// `meta` (the sink calls `to_string_lossy` on all meta values, so any type
 /// is safe there).
-fn attr_into_maps(k: vrl::value::KeyString, v: &Value, meta: &mut ObjectMap, metrics: &mut ObjectMap) {
+fn attr_into_maps(
+    k: vrl::value::KeyString,
+    v: &Value,
+    meta: &mut ObjectMap,
+    metrics: &mut ObjectMap,
+) {
     match v {
         Value::Integer(i) => {
             // SAFETY: i64 → f64 is always finite (never NaN), so Value::from is safe.
@@ -121,7 +126,7 @@ impl SyncTransform for OtelToDatadog {
         let trace_id: i64 = {
             let s = trace_id_hex.as_str();
             if s.len() >= 16 {
-                hex_to_i64(&s[s.len() - 16..])
+                hex_to_i64(s.get(s.len() - 16..).unwrap_or(s))
             } else {
                 hex_to_i64(s)
             }
@@ -157,15 +162,13 @@ impl SyncTransform for OtelToDatadog {
                 }
             });
 
-        let end_ts = trace
-            .get(event_path!("end_time_unix_nano"))
-            .and_then(|v| {
-                if let Value::Timestamp(ts) = v {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            });
+        let end_ts = trace.get(event_path!("end_time_unix_nano")).and_then(|v| {
+            if let Value::Timestamp(ts) = v {
+                Some(*ts)
+            } else {
+                None
+            }
+        });
 
         let duration: i64 = match (start_ts, end_ts) {
             (Some(start), Some(end)) => (end - start).num_nanoseconds().unwrap_or(0).max(0),
@@ -243,16 +246,14 @@ impl SyncTransform for OtelToDatadog {
         }
 
         // error.message from status.message (only for error spans with a non-empty message)
-        if error == 1 {
-            if let Some(Value::Bytes(b)) = trace
+        if error == 1
+            && let Some(Value::Bytes(b)) = trace
                 .get(event_path!("status"))
                 .and_then(|v| v.as_object())
                 .and_then(|o| o.get("message"))
-            {
-                if !b.is_empty() {
-                    meta.insert("error.message".into(), Value::Bytes(b.clone()));
-                }
-            }
+            && !b.is_empty()
+        {
+            meta.insert("error.message".into(), Value::Bytes(b.clone()));
         }
 
         // span.kind as a human-readable string for visibility in Datadog tags.
@@ -291,8 +292,7 @@ impl SyncTransform for OtelToDatadog {
         let attrs_obj = trace
             .get(event_path!("attributes"))
             .and_then(|v| v.as_object());
-        let has_attr =
-            |key: &str| attrs_obj.map(|a| a.contains_key(key)).unwrap_or(false);
+        let has_attr = |key: &str| attrs_obj.map(|a| a.contains_key(key)).unwrap_or(false);
 
         let span_type: Option<&'static str> = if has_attr("db.system") {
             Some("db")
@@ -917,7 +917,10 @@ mod tests {
 
         // one span event
         let mut ev_attrs = ObjectMap::new();
-        ev_attrs.insert("db.statement".into(), Value::Bytes(Bytes::from_static(b"SELECT 1")));
+        ev_attrs.insert(
+            "db.statement".into(),
+            Value::Bytes(Bytes::from_static(b"SELECT 1")),
+        );
         let mut span_event = ObjectMap::new();
         span_event.insert(
             "name".into(),
@@ -948,11 +951,19 @@ mod tests {
 
         // default output: one TraceEvent
         let traces: Vec<_> = buf.drain_default().collect();
-        assert_eq!(traces.len(), 1, "expected one trace event on default output");
+        assert_eq!(
+            traces.len(),
+            1,
+            "expected one trace event on default output"
+        );
 
         // span_events output: one LogEvent
         let logs: Vec<_> = buf.drain_named(SPAN_EVENTS_OUTPUT).collect();
-        assert_eq!(logs.len(), 1, "expected one log event on span_events output");
+        assert_eq!(
+            logs.len(),
+            1,
+            "expected one log event on span_events output"
+        );
 
         let log = logs.into_iter().next().unwrap().into_log();
         assert_eq!(
@@ -973,7 +984,8 @@ mod tests {
             Some(&Value::Bytes(Bytes::from(expected_dd_trace_id))),
             "dd.trace_id mismatch"
         );
-        let expected_dd_span_id = (u64::from_str_radix("eee19b7ec3c1b174", 16).unwrap()).to_string();
+        let expected_dd_span_id =
+            (u64::from_str_radix("eee19b7ec3c1b174", 16).unwrap()).to_string();
         assert_eq!(
             log.get(event_path!("dd", "span_id")),
             Some(&Value::Bytes(Bytes::from(expected_dd_span_id))),

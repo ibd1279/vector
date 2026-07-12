@@ -37,7 +37,10 @@ impl ResourceSpans {
             .into_iter()
             .flat_map(|scope_spans| {
                 let scope = scope_spans.scope;
-                scope_spans.spans.into_iter().map(move |span| (scope.clone(), span))
+                scope_spans
+                    .spans
+                    .into_iter()
+                    .map(move |span| (scope.clone(), span))
             })
             .map(move |(scope, span)| {
                 ResourceSpan {
