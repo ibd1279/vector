@@ -60,8 +60,12 @@ pub struct ThreadTime(Inner);
 
 impl ThreadTime {
     /// Captures the current thread CPU time.
+    // Not `const` because on Linux/macOS/Windows `Inner::now()` issues a
+    // syscall (`clock_gettime`/`GetThreadTimes`); only the no-op fallback
+    // used on other platforms happens to be const-eligible.
     #[inline]
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn now() -> Self {
         ThreadTime(Inner::now())
     }
@@ -69,6 +73,7 @@ impl ThreadTime {
     /// Returns the CPU time elapsed since this snapshot was taken.
     #[inline]
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn elapsed(&self) -> Duration {
         self.0.elapsed()
     }
@@ -184,12 +189,12 @@ struct Inner;
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
 impl Inner {
     #[inline]
-    fn now() -> Self {
+    const fn now() -> Self {
         Inner
     }
 
     #[inline]
-    fn elapsed(&self) -> Duration {
+    const fn elapsed(&self) -> Duration {
         Duration::ZERO
     }
 }
@@ -364,7 +369,7 @@ pub fn register_counter() -> Counter {
 /// is **not** emitted at all, rather than reporting wall-clock or zero values
 /// that would be misleading to compare against supported platforms.
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
-pub fn register_counter() -> Counter {
+pub const fn register_counter() -> Counter {
     Counter::noop()
 }
 

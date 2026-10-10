@@ -1,11 +1,18 @@
 #![warn(clippy::pedantic)]
 
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
+#[cfg(feature = "sources-host_metrics")]
+use std::path::PathBuf;
 
+#[cfg(feature = "sources-host_metrics")]
 use futures_util::{FutureExt, StreamExt, TryFutureExt, TryStreamExt, stream};
+#[cfg(feature = "sources-host_metrics")]
 use heim::{disk::Partition, units::information::byte};
+#[cfg(feature = "sources-host_metrics")]
 use indexmap::IndexMap;
-use vector_lib::{buffers::config::DiskUsage, internal_event::DEFAULT_OUTPUT};
+#[cfg(feature = "sources-host_metrics")]
+use vector_lib::buffers::config::DiskUsage;
+use vector_lib::internal_event::DEFAULT_OUTPUT;
 
 use super::{
     ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder, enrichment_table_sinks,
@@ -287,97 +294,104 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
         return Ok(());
     }
 
-    // Now query all the mountpoints on the system, and get their total capacity. We also have to
-    // sort the mountpoints from longest to shortest so we can find the longest prefix match for
-    // each buffer data directory by simply iterating from beginning to end.
-    let mountpoints = heim::disk::partitions()
-        .and_then(|stream| stream.try_collect::<Vec<_>>().and_then(process_partitions))
-        .or_else(|_| {
-            heim::disk::partitions_physical()
-                .and_then(|stream| stream.try_collect::<Vec<_>>().and_then(process_partitions))
-        })
-        .await;
+    #[cfg(feature = "sources-host_metrics")]
+    {
+        // Now query all the mountpoints on the system, and get their total capacity. We also have to
+        // sort the mountpoints from longest to shortest so we can find the longest prefix match for
+        // each buffer data directory by simply iterating from beginning to end.
+        let mountpoints = heim::disk::partitions()
+            .and_then(|stream| stream.try_collect::<Vec<_>>().and_then(process_partitions))
+            .or_else(|_| {
+                heim::disk::partitions_physical()
+                    .and_then(|stream| stream.try_collect::<Vec<_>>().and_then(process_partitions))
+            })
+            .await;
 
-    let mountpoints = match mountpoints {
-        Ok(mut mountpoints) => {
-            mountpoints.sort_by(|m1, _, m2, _| m2.cmp(m1));
-            mountpoints
-        }
-        Err(e) => {
-            warn!(
-                cause = %e,
-                message = "Failed to query disk partitions. Cannot ensure that buffer size limits are within physical storage capacity limits.",
-            );
-            return Ok(());
-        }
-    };
-
-    // Now build a mapping of buffer IDs/usage configuration to the mountpoint they reside on.
-    let mountpoint_buffer_mapping = configured_disk_buffers.into_iter().fold(
-        HashMap::new(),
-        |mut mappings: HashMap<PathBuf, Vec<DiskUsage>>, usage| {
-            let canonicalized_data_dir = usage
-                .data_dir()
-                .canonicalize()
-                .unwrap_or_else(|_| usage.data_dir().to_path_buf());
-            let mountpoint = mountpoints
-                .keys()
-                .find(|mountpoint| canonicalized_data_dir.starts_with(mountpoint));
-
-            match mountpoint {
-                None => warn!(
-                    buffer_id = usage.id().id(),
-                    data_dir = usage.data_dir().to_string_lossy().as_ref(),
-                    canonicalized_data_dir = canonicalized_data_dir.to_string_lossy().as_ref(),
-                    message = "Found no matching mountpoint for buffer data directory.",
-                ),
-                Some(mountpoint) => {
-                    mappings.entry(mountpoint.clone()).or_default().push(usage);
-                }
+        let mountpoints = match mountpoints {
+            Ok(mut mountpoints) => {
+                mountpoints.sort_by(|m1, _, m2, _| m2.cmp(m1));
+                mountpoints
             }
+            Err(e) => {
+                warn!(
+                    cause = %e,
+                    message = "Failed to query disk partitions. Cannot ensure that buffer size limits are within physical storage capacity limits.",
+                );
+                return Ok(());
+            }
+        };
 
-            mappings
-        },
-    );
+        // Now build a mapping of buffer IDs/usage configuration to the mountpoint they reside on.
+        let mountpoint_buffer_mapping = configured_disk_buffers.into_iter().fold(
+            HashMap::new(),
+            |mut mappings: HashMap<PathBuf, Vec<DiskUsage>>, usage| {
+                let canonicalized_data_dir = usage
+                    .data_dir()
+                    .canonicalize()
+                    .unwrap_or_else(|_| usage.data_dir().to_path_buf());
+                let mountpoint = mountpoints
+                    .keys()
+                    .find(|mountpoint| canonicalized_data_dir.starts_with(mountpoint));
 
-    // Finally, we have a mapping of disk buffers, based on their underlying mountpoint. Go through
-    // and check to make sure the sum total of `max_size` for all buffers associated with each
-    // mountpoint does not exceed that mountpoint's total capacity.
-    //
-    // We specifically do not do any sort of warning on free space because that has to be the
-    // responsibility of the operator to ensure there's enough total space for all buffers present.
-    let mut errors = Vec::new();
+                match mountpoint {
+                    None => warn!(
+                        buffer_id = usage.id().id(),
+                        data_dir = usage.data_dir().to_string_lossy().as_ref(),
+                        canonicalized_data_dir = canonicalized_data_dir.to_string_lossy().as_ref(),
+                        message = "Found no matching mountpoint for buffer data directory.",
+                    ),
+                    Some(mountpoint) => {
+                        mappings.entry(mountpoint.clone()).or_default().push(usage);
+                    }
+                }
 
-    for (mountpoint, buffers) in mountpoint_buffer_mapping {
-        let buffer_max_size_total: u64 = buffers
-            .iter()
-            .map(vector_lib::buffers::config::DiskUsage::max_size)
-            .sum();
-        let mountpoint_total_capacity = mountpoints
-            .get(&mountpoint)
-            .copied()
-            .expect("mountpoint must exist");
+                mappings
+            },
+        );
 
-        if buffer_max_size_total > mountpoint_total_capacity {
-            let component_ids = buffers
+        // Finally, we have a mapping of disk buffers, based on their underlying mountpoint. Go through
+        // and check to make sure the sum total of `max_size` for all buffers associated with each
+        // mountpoint does not exceed that mountpoint's total capacity.
+        //
+        // We specifically do not do any sort of warning on free space because that has to be the
+        // responsibility of the operator to ensure there's enough total space for all buffers present.
+        let mut errors = Vec::new();
+
+        for (mountpoint, buffers) in mountpoint_buffer_mapping {
+            let buffer_max_size_total: u64 = buffers
                 .iter()
-                .map(|usage| usage.id().id())
-                .collect::<Vec<_>>();
-            errors.push(format!(
-                "Mountpoint '{}' has total capacity of {mountpoint_total_capacity} bytes, but configured buffers using mountpoint have total maximum size of {buffer_max_size_total} bytes. \
+                .map(vector_lib::buffers::config::DiskUsage::max_size)
+                .sum();
+            let mountpoint_total_capacity = mountpoints
+                .get(&mountpoint)
+                .copied()
+                .expect("mountpoint must exist");
+
+            if buffer_max_size_total > mountpoint_total_capacity {
+                let component_ids = buffers
+                    .iter()
+                    .map(|usage| usage.id().id())
+                    .collect::<Vec<_>>();
+                errors.push(format!(
+                    "Mountpoint '{}' has total capacity of {mountpoint_total_capacity} bytes, but configured buffers using mountpoint have total maximum size of {buffer_max_size_total} bytes. \
 Reduce the `max_size` of the buffers to fit within the total capacity of the mountpoint. (components associated with mountpoint: {})",
-                mountpoint.to_string_lossy(), component_ids.join(", "),
-            ));
+                    mountpoint.to_string_lossy(), component_ids.join(", "),
+                ));
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
         }
     }
 
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors)
-    }
+    #[cfg(not(feature = "sources-host_metrics"))]
+    Ok(())
 }
 
+#[cfg(feature = "sources-host_metrics")]
 async fn process_partitions(partitions: Vec<Partition>) -> heim::Result<IndexMap<PathBuf, u64>> {
     stream::iter(partitions)
         .map(Ok)

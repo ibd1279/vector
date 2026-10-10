@@ -505,7 +505,7 @@ arr_macro = { version = "0.2.1" }
 
 # depending on fork for bumped nix dependency
 # https://github.com/heim-rs/heim/pull/360
-heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-deps", default-features = false, features = ["disk"] }
+heim = { path = "../heim/heim", default-features = false, features = ["disk"], optional = true }
 
 # make sure to update the external docs when the Lua version changes
 mlua = { workspace = true, features = ["macros"], optional = true }
@@ -601,6 +601,27 @@ vendored = ["gssapi-vendored"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
 base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet"]
+# FreeBSD minimal feature profile matching vector.yaml: OTLP in, Datadog out, internal telemetry, remap transforms.
+# Renamed from `minimal` (our original fork feature name) to avoid clashing with upstream's own `minimal` feature.
+freebsd-minimal = [
+  "api",
+  "transforms-remap",
+  "vrl/stdlib",
+  # Sources used in vector.yaml
+  "sources-opentelemetry",
+  "sources-syslog",
+  "sources-internal_logs",
+  "sources-internal_metrics",
+  # Transforms
+  "transforms-otel_to_datadog",
+  # Sinks used in vector.yaml
+  "sinks-datadog_logs",
+  "sinks-datadog_metrics",
+  "sinks-datadog_traces",
+  # Debug sinks
+  "sinks-console",
+  "sinks-file",
+]
 enable-api-client = ["base", "api-client"]
 default-musl = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build"]
 default-no-api-client = ["base", "sources-dnstap", "tikv-jemallocator", "vendored"]
@@ -778,7 +799,7 @@ sources-file_descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "sources-utils-net-tcp", "sources-utils-net-unix", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost", "dep:prost-types", "protobuf-build", "dep:tonic"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http_server"]
-sources-host_metrics = ["heim/cpu", "heim/host", "heim/memory", "heim/net"]
+sources-host_metrics = ["dep:heim", "heim/cpu", "heim/host", "heim/memory", "heim/net"]
 sources-http_client = ["sources-utils-http-client"]
 sources-http_server = ["sources-utils-http", "sources-utils-http-headers", "sources-utils-http-query"]
 sources-internal_logs = []

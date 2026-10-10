@@ -14,6 +14,8 @@ ZERO_AR_DATE = "1"
 # Setting SOURCE_DATE_EPOCH to a fixed epoch makes OpenSSL 3.x use a
 # reproducible timestamp instead, producing identical artifacts across builds.
 SOURCE_DATE_EPOCH = "0"
+# Disable linker version script in librdkafka: FreeBSD's lld errors on undefined symbols in version scripts
+DISABLE_LDS = "y"
 
 [target.'cfg(all())']
 rustflags = [
