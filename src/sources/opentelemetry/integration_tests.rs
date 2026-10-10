@@ -123,7 +123,12 @@ async fn receive_trace() {
         resource_spans: vec![ResourceSpans {
             resource: None,
             scope_spans: vec![ScopeSpans {
-                scope: None,
+                scope: Some(InstrumentationScope {
+                    name: "test-library".to_string(),
+                    version: "1.0.0".to_string(),
+                    attributes: vec![],
+                    dropped_attributes_count: 0,
+                }),
                 spans: vec![Span {
                     trace_id: (1..17).collect_vec(),      //trace_id [u8;16]
                     span_id: (1..9).collect_vec(),        // span_id [u8;8]
